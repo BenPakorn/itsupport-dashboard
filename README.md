@@ -1,1 +1,386 @@
-# itsupport-dashboard
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Support Report - June 2025 (Live Data)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Add PapaParse for easy CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        /* CSS styles remain the same as before, with one adjustment for kpi-grid */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(15px); border-radius: 24px; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15); overflow: hidden; animation: slideUp 1s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        .header { text-align: center; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); animation: rotate 20s linear infinite; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .title { font-size: 2.8rem; font-weight: 800; margin-bottom: 10px; position: relative; z-index: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .subtitle { font-size: 1.3rem; font-weight: 300; opacity: 0.9; position: relative; z-index: 1; }
+        .main-content { padding: 40px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; margin-bottom: 30px; }
+        .card { background: linear-gradient(145deg, #ffffff, #f8fafc); border-radius: 20px; padding: 30px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08); border: 1px solid rgba(255, 255, 255, 0.6); transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; overflow: hidden; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #1e3c72, #2a5298, #4facfe); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15); }
+        .card-title { font-size: 1.5rem; font-weight: 700; color: #1e3c72; margin-bottom: 25px; display: flex; align-items: center; gap: 12px; }
+        .icon { font-size: 1.8rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+        .chart-container { position: relative; height: 250px; margin-bottom: 20px; }
+        /* Adjusted kpi-grid to better handle 5 items */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .kpi-item { text-align: center; padding: 20px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 15px; transition: all 0.3s ease; position: relative; overflow: hidden; }
+        .kpi-item::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #10b981, #3b82f6); }
+        .kpi-item.bug::before { background: linear-gradient(90deg, #ef4444, #f97316); } /* Special color for bug KPI */
+        .kpi-item:hover { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; transform: translateY(-3px); }
+        .kpi-number { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #1e3c72, #2a5298); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .kpi-item:hover .kpi-number { -webkit-text-fill-color: white; }
+        .kpi-label { font-size: 0.9rem; color: #64748b; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .kpi-item:hover .kpi-label { color: rgba(255, 255, 255, 0.9); }
+        .performance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 25px; }
+        .metric { text-align: center; padding: 25px; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); border-radius: 16px; transition: all 0.4s ease; position: relative; overflow: hidden; }
+        .metric::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; background: linear-gradient(45deg, #1e3c72, #2a5298, #4facfe, #00f2fe); border-radius: 18px; z-index: -1; opacity: 0; transition: opacity 0.3s ease; }
+        .metric:hover::before { opacity: 1; }
+        .metric:hover { background: white; transform: translateY(-5px) scale(1.05); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15); }
+        .metric-value { font-size: 2rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #1e3c72, #2a5298); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .metric-label { font-size: 0.9rem; color: #64748b; font-weight: 600; }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; margin-top: 25px; }
+        .module-item { text-align: center; padding: 20px 15px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 12px; transition: all 0.3s ease; position: relative; overflow: hidden; }
+        .module-item::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4facfe, #00f2fe); transform: scaleX(0); transition: transform 0.3s ease; }
+        .module-item:hover::before { transform: scaleX(1); }
+        .module-item:hover { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; transform: translateY(-5px) rotate(2deg); }
+        .module-icon { font-size: 2rem; margin-bottom: 8px; }
+        .module-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+        .module-count { font-size: 1.2rem; font-weight: 800; color: #1e3c72; }
+        .module-item:hover .module-count { color: white; }
+        .insights-section { margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 20px; border-left: 5px solid #1e3c72; }
+        .insights-title { font-size: 1.4rem; font-weight: 700; color: #1e3c72; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .insights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; }
+        .insight-item { padding: 20px; background: white; border-radius: 12px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05); }
+        .insight-item h4 { color: #1e3c72; font-weight: 600; margin-bottom: 10px; }
+        .insight-item p { color: #64748b; line-height: 1.6; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.5rem; color: #1e3c72; text-align: center; padding: 20px; }
+        @media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } .performance-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .container { margin: 10px; } .main-content { padding: 20px; } .grid { grid-template-columns: 1fr; } .kpi-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr; } .title { font-size: 2.2rem; } }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">Loading Report Data...</div>
+
+    <div class="container" style="display: none;">
+        <div class="header">
+            <h1 class="title">Monthly IT Support Report</h1>
+            <p class="subtitle" id="report-subtitle">Live Data from Google Sheets</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- KPI Overview -->
+            <div class="grid">
+                <div class="card">
+                    <h2 class="card-title">
+                        <span class="icon">📊</span>
+                        KPI Overview
+                    </h2>
+                    <div class="chart-container">
+                        <canvas id="kpiChart"></canvas>
+                    </div>
+                    <div class="kpi-grid">
+                        <div class="kpi-item">
+                            <div class="kpi-number" id="kpi-total">...</div>
+                            <div class="kpi-label"><span>🟦</span> Total Cases</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-number" id="kpi-completed">...</div>
+                            <div class="kpi-label"><span>✅</span> Completed</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-number" id="kpi-inprogress">...</div>
+                            <div class="kpi-label"><span>⏳</span> In Progress</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-number" id="kpi-rate">...</div>
+                            <div class="kpi-label"><span>📈</span> Completion Rate</div>
+                        </div>
+                        <!-- New KPI item for Bugs -->
+                        <div class="kpi-item bug">
+                            <div class="kpi-number" id="kpi-bugs">...</div>
+                            <div class="kpi-label"><span>🐞</span> Bug Cases</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Case Distribution by Site -->
+                <div class="card">
+                    <h2 class="card-title">
+                        <span class="icon">🏢</span>
+                        Case Distribution by Site
+                    </h2>
+                    <div class="chart-container">
+                        <canvas id="siteChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Case Categories -->
+                <div class="card">
+                    <h2 class="card-title">
+                        <span class="icon">📋</span>
+                        Case Categories
+                    </h2>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Other cards remain the same -->
+            <div class="grid">
+                <div class="card">
+                    <h2 class="card-title">
+                        <span class="icon">⚙️</span>
+                        Top Modules Involved
+                    </h2>
+                    <div class="modules-grid" id="modules-grid-container">
+                        <!-- Module items will be generated by script -->
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">
+                        <span class="icon">⏱️</span>
+                        Response & Resolution Time
+                    </h2>
+                    <div class="performance-grid">
+                        <div class="metric">
+                            <div class="metric-value" id="perf-response">...</div>
+                            <div class="metric-label">⏱ Avg Response</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="perf-close">...</div>
+                            <div class="metric-label">🕒 Avg Close Time</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="perf-over24">...</div>
+                            <div class="metric-label">⚠️ Cases > 24hrs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                <!-- Insights will be generated by script -->
+                    <div class="insights-section">
+                    <h3 class="insights-title">
+                    <span class="icon">❓</span>
+                    Unresolved/Unknown Cause Cases
+                </h3>
+                <div class="insights-grid" id="unknown-causes-container">
+                    
+
+                
+                <div class="insights-grid" id="insights-container">
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- CONFIGURATION ---
+        // IMPORTANT: Paste your Google Sheet "Publish to the web" CSV URL here.
+        const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzCBPao2gS-RBnLzR4cjJ0ugGw7Y7_XwQ3WLaCQOLxI4B0TuWebgzCYKuXddwj8Ut9e4iZhhcf2X8T/pub?gid=1155207959&single=true&output=csv';
+
+        // --- CHART & DATA HANDLING ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const kpiChart = createKpiChart();
+            const siteChart = createSiteChart();
+            const categoryChart = createCategoryChart();
+            loadAndDisplayData(kpiChart, siteChart, categoryChart);
+        });
+
+        async function loadAndDisplayData(kpiChart, siteChart, categoryChart) {
+            const loadingOverlay = document.getElementById('loading');
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL);
+                if (!response.ok) throw new Error(`Network Error (Status: ${response.status})`);
+                const csvText = await response.text();
+                
+                Papa.parse(csvText, {
+                    header: true,
+                    transformHeader: header => header.trim().toLowerCase(),
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        if (!results.data || results.data.length === 0) {
+                            throw new Error("Sheet is empty or unreadable.");
+                        }
+
+                        // Check if the sheet has the 'key' column, indicating it's the aggregated data format.
+                        if (!results.data[0].hasOwnProperty('key')) {
+                            throw new Error("Data Format Error: The sheet is missing the 'key' column. This dashboard expects a pre-aggregated data format.");
+                        }
+
+                        const processedData = processAggregatedData(results.data);
+                        
+                        updateAllVisuals(processedData, kpiChart, siteChart, categoryChart);
+                        
+                        loadingOverlay.style.display = 'none';
+                        document.querySelector('.container').style.display = 'block';
+                    },
+                    error: (error) => { throw new Error(`CSV Parsing Error: ${error.message}`); }
+                });
+
+            } catch (error) {
+                console.error('Failed to load or process sheet data:', error);
+                loadingOverlay.innerHTML = `
+                    <strong>Error: Could not load report data.</strong>
+                    <br><br>
+                    Please check the following:
+                    <br>1. The Google Sheet URL is correct.
+                    <br>2. The sheet is "Published to the web" as a CSV.
+                    <br>3. The sheet has a 'key' column for aggregated data.
+                    <br><br>
+                    <small>Details: ${error.message}</small>
+                `;
+            }
+        }
+
+        function processAggregatedData(rows) {
+            const data = { kpis: {}, performance: {}, sites: [], categories: [], modules: [], insights: [], unknownCauses: [] };
+            const tempKpis = {};
+
+            for (const row of rows) {
+                const key = row.key;
+                const value1 = row.value1;
+                const value2 = row.value2;
+                const value3 = row.value3;
+
+                if (key.startsWith('kpi_')) tempKpis[key] = value1;
+                else if (key.startsWith('perf_')) data.performance[key] = value1;
+                else if (key === 'site_data') data.sites.push({ name: value1, count: parseInt(value2) || 0 });
+                else if (key === 'category_data') data.categories.push({ name: value1, count: parseInt(value2) || 0 });
+                else if (key === 'module_data') data.modules.push({ name: value1, count: parseInt(value2) || 0, icon: value3 });
+                else if (key === 'insight_data') data.insights.push({ title: value1, text: value2 });
+                else if (key === 'unknown_cause_description') data.unknownCauses.push({ description: value1 }); // Store description of unknown cause
+                else if (key === 'report_subtitle') document.getElementById('report-subtitle').innerText = value1;
+            }
+            data.kpis = tempKpis;
+            return data;
+        }
+
+        function updateAllVisuals(data, kpiChart, siteChart, categoryChart) {
+            updateKpiCard(data.kpis, kpiChart);
+            updateSiteChart(data.sites, siteChart);
+            updateCategoryChart(data.categories, categoryChart);
+            updatePerformanceMetrics(data.performance);
+            updateModules(data.modules);
+            updateInsights(data.insights);
+            updateUnknownCauses(data.unknownCauses); // Call the new function
+        }
+
+        function updateKpiCard(kpis, chart) {
+            const completed = parseInt(kpis.kpi_completed) || 0;
+            const inProgress = parseInt(kpis.kpi_inprogress) || 0;
+            const bugCases = parseInt(kpis.kpi_bugs) || 0; // Read the new bug KPI
+            const total = completed + inProgress;
+            const rate = total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%';
+
+            document.getElementById('kpi-total').innerText = total;
+            document.getElementById('kpi-completed').innerText = completed;
+            document.getElementById('kpi-inprogress').innerText = inProgress;
+            document.getElementById('kpi-rate').innerText = rate;
+            document.getElementById('kpi-bugs').innerText = bugCases;
+            
+            chart.data.datasets[0].data = [completed, inProgress];
+            chart.update();
+        }
+
+        function updateSiteChart(sites, chart) {
+            sites.sort((a, b) => b.count - a.count);
+            chart.data.labels = sites.map(s => s.name);
+            chart.data.datasets[0].data = sites.map(s => s.count);
+            chart.update();
+        }
+
+        function updateCategoryChart(categories, chart) {
+            chart.data.labels = categories.map(c => c.name);
+            chart.data.datasets[0].data = categories.map(c => c.count);
+            chart.update();
+        }
+
+        function updatePerformanceMetrics(performance) {
+            document.getElementById('perf-response').innerText = performance.perf_response || 'N/A';
+            document.getElementById('perf-close').innerText = performance.perf_close || 'N/A';
+            document.getElementById('perf-over24').innerText = performance.perf_over24 || 'N/A';
+        }
+
+        function updateModules(modules) {
+            const container = document.getElementById('modules-grid-container');
+            container.innerHTML = '';
+            modules.sort((a, b) => b.count - a.count);
+            modules.forEach(module => {
+                const item = document.createElement('div');
+                item.className = 'module-item';
+                item.innerHTML = `
+                    <div class="module-icon">${module.icon || '⚙️'}</div>
+                    <div class="module-name">${module.name}</div>
+                    <div class="module-count">${module.count}</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        function updateInsights(insights) {
+            const container = document.getElementById('insights-container');
+            container.innerHTML = '';
+            insights.forEach(insight => {
+                const item = document.createElement('div');
+                item.className = 'insight-item';
+                item.innerHTML = `
+                    <h4>${insight.title}</h4>
+                    <p>${insight.text}</p>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // New function to display unknown causes
+        function updateUnknownCauses(unknownCauses) {
+            const container = document.getElementById('unknown-causes-container');
+            container.innerHTML = ''; // Clear existing unknown causes before populating
+
+            unknownCauses.forEach(item => {
+                const insightItem = document.createElement('div');
+                insightItem.className = 'insight-item';
+                insightItem.innerHTML = `
+                    <h4>Description: ${item.description}</h4>
+                    <p>เคสนี้ยังไม่สามารถระบุสาเหตุที่ชัดเจนได้ ต้องการการตรวจสอบเพิ่มเติม.</p>
+                `;
+                container.appendChild(insightItem);
+            });
+
+        }
+
+        function createKpiChart() {
+            const ctx = document.getElementById('kpiChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: ['Completed', 'In Progress'], datasets: [{ data: [], backgroundColor: ['#10b981', '#f59e0b'], hoverBackgroundColor: ['#059669', '#d97706'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' }
+            });
+        }
+
+        function createSiteChart() {
+            const ctx = document.getElementById('siteChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#1e3c72', '#2a5298', '#4facfe', '#00f2fe', '#43e97b'], borderRadius: 10 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } } }
+            });
+        }
+
+        function createCategoryChart() {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'pie',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ef4444', '#3b82f6'], hoverBackgroundColor: ['#dc2626', '#2563eb'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, font: { size: 12 } } } } }
+            });
+        }
+    </script>
+</body>
+</html>
