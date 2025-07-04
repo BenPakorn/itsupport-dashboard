@@ -164,7 +164,7 @@
                     <div class="performance-grid">
                         <div class="metric">
                             <div class="metric-value" id="perf-response">...</div>
-                            <div class="metric-label">🕒 Avg Response</div>
+                            <div class="metric-label">⏱ Avg Response</div>
                         </div>
                         <div class="metric">
                             <div class="metric-value" id="perf-close">...</div>
@@ -181,7 +181,7 @@
                 <div class="insights-section">
                     <h3 class="insights-title">
                     <span class="icon">❓</span>
-                    Unknown Cause Cases
+                    Unresolved/Unknown Cause Cases
                 </h3>
                 <div class="insights-grid" id="unknown-causes-container">
                     
@@ -441,13 +441,60 @@
             });
         }
 
-        // ฟังก์ชันสร้าง Site Chart (ไม่มีการเปลี่ยนแปลง)
+        // ฟังก์ชันสร้าง Site Chart (แก้ไขส่วนสี)
         function createSiteChart() {
             const ctx = document.getElementById('siteChart').getContext('2d');
             return new Chart(ctx, {
                 type: 'bar',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#1e3c72', '#2a5298', '#4facfe', '#00f2fe', '#43e97b'], borderRadius: 10 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } } }
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        // *** เปลี่ยนชุดสีตรงนี้ ***
+                        backgroundColor: [
+                            '#FF6384', // แดงอมชมพู
+                            '#36A2EB', // น้ำเงิน
+                            '#FFCE56', // เหลือง
+                            '#4BC0C0', // เขียวอมฟ้า
+                            '#9966FF', // ม่วง
+                            '#FF9F40', // ส้ม
+                            '#8A2BE2', // น้ำเงินม่วง (BlueViolet)
+                            '#00CED1', // เทอร์ควอยซ์เข้ม (DarkTurquoise)
+                            '#FFD700', // ทอง (Gold)
+                            '#FF1493', // ชมพูเข้ม (DeepPink)
+                            '#00BFFF', // ฟ้าสด (DeepSkyBlue)
+                            '#3CB371', // เขียวปานกลาง (MediumSeaGreen)
+                            '#CD5C5C', // แดงอมน้ำตาล (IndianRed)
+                            '#6A5ACD', // น้ำเงินอมม่วง (SlateBlue)
+                            '#FF4500'  // ส้มแดง (OrangeRed)
+                        ],
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { // เพิ่ม Title ให้กราฟ (ถ้าต้องการ)
+                            display: true,
+                            text: 'Case Distribution by Site',
+                            font: { size: 16, weight: 'bold' },
+                            color: '#1e3c72'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b' } // สีตัวอักษรบนแกน X
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { color: '#64748b' } // สีตัวอักษรบนแกน Y
+                        }
+                    }
+                }
             });
         }
 
@@ -502,7 +549,7 @@
             });
         }
 
-        // NEW: ฟังก์ชันสร้าง Issue From Chart
+        // ฟังก์ชันสร้าง Issue From Chart (แก้ไขส่วนสี)
         function createIssueFromChart() {
             const ctx = document.getElementById('issueFromChart').getContext('2d');
             return new Chart(ctx, {
@@ -511,12 +558,21 @@
                     labels: [], // จะถูกเติมด้วย 'E-Mail', 'Line', 'On-Call'
                     datasets: [{
                         data: [], // จะถูกเติมด้วยจำนวนเคส
-                        backgroundColor: [ // สีสำหรับแต่ละส่วน
-                            '#4CAF50', // E-Mail (เขียว)
-                            '#2196F3', // Line (ฟ้า)
-                            '#FFC107', // On-Call (เหลืองส้ม)
-                            '#9C27B0', // สีเสริมถ้ามีช่องทางอื่น
-                            '#FF5722'  // สีเสริม
+                        // *** เปลี่ยนชุดสีตรงนี้ ***
+                        backgroundColor: [
+                            '#9966FF', // Emerald Green
+                            '#4BC0C0', // Peter River Blue
+                            '#FF9F40', // Sunflower Yellow
+                            '#e74c3c', // Alizarin Red
+                            '#9b59b6', // Amethyst Purple
+                            '#1abc9c', // Turquoise
+                            '#e67e22', // Carrot Orange
+                            '#34495e', // Wet Asphalt Dark Blue
+                            '#FF6384', // เดิมจาก Site Chart (Red)
+                            '#FFCE56', // เดิมจาก Site Chart (Yellow)
+                            '#4BC0C0', // เดิมจาก Site Chart (Aqua)
+                            '#9966FF', // เดิมจาก Site Chart (Purple)
+                            '#FF9F40'  // เดิมจาก Site Chart (Orange)
                         ],
                         hoverOffset: 8, // ยกออกมาเล็กน้อยเมื่อเมาส์ชี้
                         borderWidth: 0 // ไม่มีเส้นขอบ
@@ -530,7 +586,8 @@
                             position: 'bottom', // Legend อยู่ด้านล่าง
                             labels: {
                                 padding: 20,
-                                font: { size: 12 }
+                                font: { size: 12 },
+                                color: '#64748b' // สีตัวอักษรของ legend
                             }
                         },
                         tooltip: { // ปรับ Tooltip เพื่อให้แสดงข้อมูลได้ดีขึ้น
@@ -541,11 +598,17 @@
                                         label += ': ';
                                     }
                                     if (context.parsed !== null) {
-                                        label += context.parsed; // แสดงจำนวนเคส
+                                        label += context.parsed + ' cases'; // เพิ่มหน่วย 'cases'
                                     }
                                     return label;
                                 }
                             }
+                        },
+                        title: { // เพิ่ม Title ให้กราฟ (ถ้าต้องการ)
+                            display: true,
+                            text: 'Issue Source Distribution',
+                            font: { size: 16, weight: 'bold' },
+                            color: '#1e3c72'
                         }
                     },
                     cutout: '70%' // ทำให้เป็น Doughnut Chart (วงแหวน)
