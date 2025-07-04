@@ -185,50 +185,58 @@
     <script>
         // --- CONFIGURATION ---
         // IMPORTANT: Paste your Google Sheet "Publish to the web" CSV URL here.
-        const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzCBPao2gS-RBnLzR4cjJ0ugGw7Y7_XwQ3WLaCQOLxI4B0TuWebgzCYKuXddwj8Ut9e4iZhhcf2X8T/pub?gid=1155207959&single=true&output=csv';
+        // นี่คือ URL พื้นฐานของ Google Sheet ของคุณที่ Publish เป็น CSV
+        const GOOGLE_SHEET_BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzCBPao2gS-RBnLzR4cjJ0ugGw7Y7_XwQ3WLaCQOLxI4B0TuWebgzCYKuXddwj8Ut9e4iZhhcf2X8T/pub?gid=1155207959&single=true&output=csv';
 
-        // --- CHART & DATA HANDLING ---
-        // ไม่ต้องประกาศที่ global scope ตรงนี้แล้ว
-        // let kpiChart, siteChart, categoryChart, priorityChart; 
+        // ฟังก์ชันสำหรับสร้าง URL พร้อม Cache-Buster เพื่อบังคับให้ดึงข้อมูลใหม่เสมอ
+        function getGoogleSheetUrlWithCacheBust() {
+            const timestamp = new Date().getTime(); // ได้รับค่า timestamp ปัจจุบัน (ไม่ซ้ำกัน)
+            return `${GOOGLE_SHEET_BASE_URL}&cachebust=${timestamp}`;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // ประกาศตัวแปร chart ใน scope ของ DOMContentLoaded
+            // สร้าง Chart instances เมื่อ DOM โหลดเสร็จ
             const kpiChart = createKpiChart();
             const siteChart = createSiteChart();
             const categoryChart = createCategoryChart();
             const priorityChart = createPriorityChart();
             
-            // เรียกโหลดข้อมูลครั้งแรก
+            // โหลดและแสดงข้อมูลครั้งแรก
             loadAndDisplayData(kpiChart, siteChart, categoryChart, priorityChart);
 
-            // รีเฟรชข้อมูลทุก 1 นาที (60000 มิลลิวินาที)
-            setInterval(async () => { // เพิ่ม async เพื่อให้สามารถใช้ await ใน try/catch ได้
-                console.log("Refreshing data...");
+            // ตั้งค่าการรีเฟรชข้อมูลทุก 1 นาที (60000 มิลลิวินาที)
+            setInterval(async () => { 
+                console.log("Refreshing data..."); // แสดงใน Console เพื่อยืนยันว่าทำงาน
                 try {
-                    // ใช้ Chart.getChart() เพื่อดึง instance ของ chart ที่ถูกต้อง
-                    // นี่คือวิธีที่ปลอดภัยกว่าเมื่อ chart ถูกสร้างขึ้นมาแล้ว
+                    // ดึง Chart instances ปัจจุบันจาก Chart.js Registry เพื่อความแม่นยำ
                     const currentKpiChart = Chart.getChart('kpiChart');
                     const currentSiteChart = Chart.getChart('siteChart');
                     const currentCategoryChart = Chart.getChart('categoryChart');
                     const currentPriorityChart = Chart.getChart('priorityChart'); 
                     
+                    // ตรวจสอบว่า Charts มีอยู่จริงก่อนที่จะพยายามอัปเดต
                     if (currentKpiChart && currentSiteChart && currentCategoryChart && currentPriorityChart) {
+                        // เรียกโหลดและแสดงข้อมูลอีกครั้ง
                         await loadAndDisplayData(currentKpiChart, currentSiteChart, currentCategoryChart, currentPriorityChart);
                         console.log("Data refreshed successfully.");
                     } else {
-                        console.warn("One or more chart instances not found during refresh attempt. Charts might not have been initialized yet or were destroyed.");
+                        console.warn("One or more chart instances not found during refresh attempt. Charts might not have been initialized yet or were destroyed. Trying again next interval.");
                     }
                 } catch (error) {
+                    // ดักจับข้อผิดพลาดและบันทึกใน Console เพื่อ Debug
                     console.error("Error during data refresh:", error);
-                    // คุณอาจต้องการแสดงข้อความข้อผิดพลาดบนหน้าจอด้วย
                 }
             }, 60000); // 60000 มิลลิวินาที = 1 นาที
         });
 
+        // ฟังก์ชันหลักในการโหลดและแสดงข้อมูล
         async function loadAndDisplayData(kpiChart, siteChart, categoryChart, priorityChart) {
             const loadingOverlay = document.getElementById('loading');
             try {
-                const response = await fetch(GOOGLE_SHEET_URL);
+                // ใช้ฟังก์ชัน getGoogleSheetUrlWithCacheBust เพื่อดึง URL ที่มี cache-buster
+                const urlToFetch = getGoogleSheetUrlWithCacheBust(); 
+                const response = await fetch(urlToFetch); // ดึงข้อมูลจาก URL ใหม่นี้
+                
                 if (!response.ok) throw new Error(`Network Error (Status: ${response.status})`);
                 const csvText = await response.text();
                 
@@ -250,6 +258,7 @@
                         
                         updateAllVisuals(processedData, kpiChart, siteChart, categoryChart, priorityChart);
                         
+                        // ซ่อน Overlay และแสดง Dashboard เมื่อโหลดเสร็จ
                         loadingOverlay.style.display = 'none';
                         document.querySelector('.container').style.display = 'block';
                     },
@@ -258,6 +267,7 @@
 
             } catch (error) {
                 console.error('Failed to load or process sheet data:', error);
+                // แสดงข้อความข้อผิดพลาดบนหน้าจอ
                 loadingOverlay.innerHTML = `
                     <strong>Error: Could not load report data.</strong>
                     <br><br>
@@ -271,6 +281,7 @@
             }
         }
 
+        // ฟังก์ชันประมวลผลข้อมูล (ไม่มีการเปลี่ยนแปลง)
         function processAggregatedData(rows) {
             const data = { kpis: {}, performance: {}, sites: [], categories: [], modules: [], insights: [], unknownCauses: [], priorities: [] };
             const tempKpis = {};
@@ -295,6 +306,7 @@
             return data;
         }
 
+        // ฟังก์ชันอัปเดตองค์ประกอบทั้งหมด (ไม่มีการเปลี่ยนแปลง)
         function updateAllVisuals(data, kpiChart, siteChart, categoryChart, priorityChart) {
             updateKpiCard(data.kpis, kpiChart);
             updateSiteChart(data.sites, siteChart);
@@ -306,6 +318,7 @@
             updatePriorityChart(data.priorities, priorityChart);
         }
 
+        // ฟังก์ชันอัปเดต KPI Card (ไม่มีการเปลี่ยนแปลง)
         function updateKpiCard(kpis, chart) {
             const completed = parseInt(kpis.kpi_completed) || 0;
             const inProgress = parseInt(kpis.kpi_inprogress) || 0;
@@ -323,6 +336,7 @@
             chart.update();
         }
 
+        // ฟังก์ชันอัปเดต Site Chart (ไม่มีการเปลี่ยนแปลง)
         function updateSiteChart(sites, chart) {
             sites.sort((a, b) => b.count - a.count);
             chart.data.labels = sites.map(s => s.name);
@@ -330,18 +344,21 @@
             chart.update();
         }
 
+        // ฟังก์ชันอัปเดต Category Chart (ไม่มีการเปลี่ยนแปลง)
         function updateCategoryChart(categories, chart) {
             chart.data.labels = categories.map(c => c.name);
             chart.data.datasets[0].data = categories.map(c => c.count);
             chart.update();
         }
 
+        // ฟังก์ชันอัปเดต Performance Metrics (ไม่มีการเปลี่ยนแปลง)
         function updatePerformanceMetrics(performance) {
             document.getElementById('perf-response').innerText = performance.perf_response || 'N/A';
             document.getElementById('perf-close').innerText = performance.perf_close || 'N/A';
             document.getElementById('perf-over24').innerText = performance.perf_over24 || 'N/A';
         }
 
+        // ฟังก์ชันอัปเดต Modules (ไม่มีการเปลี่ยนแปลง)
         function updateModules(modules) {
             const container = document.getElementById('modules-grid-container');
             container.innerHTML = '';
@@ -358,6 +375,7 @@
             });
         }
         
+        // ฟังก์ชันอัปเดต Insights (ไม่มีการเปลี่ยนแปลง)
         function updateInsights(insights) {
             const container = document.getElementById('insights-container');
             container.innerHTML = '';
@@ -372,6 +390,7 @@
             });
         }
 
+        // ฟังก์ชันอัปเดต Unknown Causes (ไม่มีการเปลี่ยนแปลง)
         function updateUnknownCauses(unknownCauses) {
             const container = document.getElementById('unknown-causes-container');
             container.innerHTML = '';
@@ -387,6 +406,7 @@
             });
         }
 
+        // ฟังก์ชันอัปเดต Priority Chart (ไม่มีการเปลี่ยนแปลง)
         function updatePriorityChart(priorities, chart) {
             const sortedPriorities = ['High', 'Medium', 'Low'].map(level => 
                 priorities.find(p => p.level === level) || { level, count: 0 }
@@ -397,6 +417,7 @@
             chart.update();
         }
 
+        // ฟังก์ชันสร้าง KPI Chart (ไม่มีการเปลี่ยนแปลง)
         function createKpiChart() {
             const ctx = document.getElementById('kpiChart').getContext('2d');
             return new Chart(ctx, {
@@ -406,6 +427,7 @@
             });
         }
 
+        // ฟังก์ชันสร้าง Site Chart (ไม่มีการเปลี่ยนแปลง)
         function createSiteChart() {
             const ctx = document.getElementById('siteChart').getContext('2d');
             return new Chart(ctx, {
@@ -415,6 +437,7 @@
             });
         }
 
+        // ฟังก์ชันสร้าง Category Chart (ไม่มีการเปลี่ยนแปลง)
         function createCategoryChart() {
             const ctx = document.getElementById('categoryChart').getContext('2d');
             return new Chart(ctx, {
@@ -424,6 +447,7 @@
             });
         }
 
+        // ฟังก์ชันสร้าง Priority Chart (ไม่มีการเปลี่ยนแปลง)
         function createPriorityChart() {
             const ctx = document.getElementById('priorityChart').getContext('2d');
             return new Chart(ctx, {
