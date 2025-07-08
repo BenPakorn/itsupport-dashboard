@@ -69,8 +69,64 @@
         <div class="header">
     <h1 class="title">Monthly IT Support Report</h1>
     <p class="subtitle" id="report-subtitle">Live Data from Google Sheets</p>
-    <p class="version" style="font-size: 0.9rem; font-weight: 300; opacity: 0.8; margin-top: 10px; position: relative; z-index: 1;">Version: 1.0</p>
+    <p class="version" style="font-size: 0.9rem; font-weight: 300; opacity: 0.8; margin-top: 10px; position: relative; z-index: 1;">Version: 2.0</p>
 </div>
+
+         <div class="main-content">
+    <div class="filter-bar" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+  <style>
+    .filter-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 10px;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+    .filter-group label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #1e3c72;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+    }
+    .filter-group select {
+      padding: 8px 14px;
+      font-size: 0.95rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: white;
+      color: #1e3c72;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .filter-group select:hover {
+      border-color: #4a6ee0;
+    }
+    .filter-group select:focus {
+      outline: none;
+      border-color: #4a6ee0;
+      box-shadow: 0 0 0 2px rgba(74, 110, 224, 0.3);
+    }
+  </style>
+      <div class="filter-group">
+        <label for="monthSelector" title="Filter data by month and year">
+          📅 Month/Year:
+        </label>
+        <select id="monthSelector" style="min-width: 180px;" title="Select the month and year to filter the dashboard">
+          <option value="all">ทั้งหมด</option>
+          <option value="2025-06">มิถุนายน 2025</option>
+          <option value="2025-07">กรกฎาคม 2025</option>
+        </select>
+      </div>
+    </div>
+    </div>
         
         <div class="main-content">
             <div class="grid">
@@ -195,437 +251,550 @@
     
     <script>
         // --- CONFIGURATION ---
-        // IMPORTANT: Paste your Google Sheet "Publish to the web" CSV URL here.
-        // นี่คือ URL พื้นฐานของ Google Sheet ของคุณที่ Publish เป็น CSV
-        const GOOGLE_SHEET_BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzCBPao2gS-RBnLzR4cjJ0ugGw7Y7_XwQ3WLaCQOLxI4B0TuWebgzCYKuXddwj8Ut9e4iZhhcf2X8T/pub?gid=1155207959&single=true&output=csv';
+const GOOGLE_SHEET_BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzCBPao2gS-RBnLzR4cjJ0ugGw7Y7_XwQ3WLaCQOLxI4B0TuWebgzCYKuXddwj8Ut9e4iZhhcf2X8T/pub?gid=1155207959&single=true&output=csv';
 
-        // ฟังก์ชันสำหรับสร้าง URL พร้อม Cache-Buster เพื่อบังคับให้ดึงข้อมูลใหม่เสมอ
-        function getGoogleSheetUrlWithCacheBust() {
-            const timestamp = new Date().getTime(); // ได้รับค่า timestamp ปัจจุบัน (ไม่ซ้ำกัน)
-            return `${GOOGLE_SHEET_BASE_URL}&cachebust=${timestamp}`;
-        }
+function getGoogleSheetUrlWithCacheBust() {
+    const timestamp = new Date().getTime();
+    return `${GOOGLE_SHEET_BASE_URL}&cachebust=${timestamp}`;
+}
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // สร้าง Chart instances เมื่อ DOM โหลดเสร็จ
-            const kpiChart = createKpiChart();
-            const siteChart = createSiteChart();
-            const categoryChart = createCategoryChart();
-            const priorityChart = createPriorityChart();
-            const issueFromChart = createIssueFromChart(); // NEW: Initialize new chart
-            
-            // โหลดและแสดงข้อมูลครั้งแรก
-            loadAndDisplayData(kpiChart, siteChart, categoryChart, priorityChart, issueFromChart); // NEW: Pass new chart instance
+let allRawData = []; // เก็บข้อมูลดิบทั้งหมดที่โหลดมา
+let currentKpiChart, currentSiteChart, currentCategoryChart, currentPriorityChart, currentIssueFromChart;
 
-            // ตั้งค่าการรีเฟรชข้อมูลทุก 1 นาที (60000 มิลลิวินาที)
-            setInterval(async () => { 
-                console.log("Refreshing data..."); // แสดงใน Console เพื่อยืนยันว่าทำงาน
-                try {
-                    // ดึง Chart instances ปัจจุบันจาก Chart.js Registry เพื่อความแม่นยำ
-                    const currentKpiChart = Chart.getChart('kpiChart');
-                    const currentSiteChart = Chart.getChart('siteChart');
-                    const currentCategoryChart = Chart.getChart('categoryChart');
-                    const currentPriorityChart = Chart.getChart('priorityChart'); 
-                    const currentIssueFromChart = Chart.getChart('issueFromChart'); // NEW: Get instance for new chart
-                    
-                    // ตรวจสอบว่า Charts มีอยู่จริงก่อนที่จะพยายามอัปเดต
-                    if (currentKpiChart && currentSiteChart && currentCategoryChart && currentPriorityChart && currentIssueFromChart) { // NEW: Add to check
-                        // เรียกโหลดและแสดงข้อมูลอีกครั้ง
-                        await loadAndDisplayData(currentKpiChart, currentSiteChart, currentCategoryChart, currentPriorityChart, currentIssueFromChart); // NEW: Pass new chart instance
-                        console.log("Data refreshed successfully.");
-                    } else {
-                        console.warn("One or more chart instances not found during refresh attempt. Charts might not have been initialized yet or were destroyed. Trying again next interval.");
-                    }
-                } catch (error) {
-                    // ดักจับข้อผิดพลาดและบันทึกใน Console เพื่อ Debug
-                    console.error("Error during data refresh:", error);
+document.addEventListener('DOMContentLoaded', () => {
+    // สร้าง Chart instances เมื่อ DOM โหลดเสร็จ
+    currentKpiChart = createKpiChart();
+    currentSiteChart = createSiteChart();
+    currentCategoryChart = createCategoryChart();
+    currentPriorityChart = createPriorityChart();
+    currentIssueFromChart = createIssueFromChart();
+
+    // โหลดข้อมูลครั้งแรกและสร้างตัวเลือกเดือน
+    loadInitialDataAndPopulateMonthSelector();
+
+    // ตั้งค่าการรีเฟรชข้อมูลทุก 1 นาที (60000 มิลลิวินาที)
+    // การรีเฟรชนี้จะโหลดข้อมูลดิบทั้งหมดใหม่ และจากนั้นจะกรองตามเดือนที่เลือก
+    setInterval(async () => {
+        console.log("Refreshing data...");
+        await loadInitialDataAndPopulateMonthSelector(); // โหลดข้อมูลทั้งหมดและอัปเดต
+        const selectedMonth = document.getElementById('monthSelector').value;
+        filterAndDisplayData(selectedMonth); // กรองและแสดงข้อมูลสำหรับเดือนที่เลือกปัจจุบัน
+        console.log("Data refreshed successfully and filtered by current selection.");
+    }, 60000); // 60000 มิลลิวินาที = 1 นาที
+
+    // เพิ่ม Event Listener สำหรับ Month Selector
+    document.getElementById('monthSelector').addEventListener('change', (event) => {
+        const selectedMonth = event.target.value;
+        filterAndDisplayData(selectedMonth);
+    });
+});
+
+async function loadInitialDataAndPopulateMonthSelector() {
+    const loadingOverlay = document.getElementById('loading');
+    loadingOverlay.style.display = 'flex'; // แสดง Loading Overlay
+    try {
+        const urlToFetch = getGoogleSheetUrlWithCacheBust();
+        const response = await fetch(urlToFetch);
+
+        if (!response.ok) throw new Error(`Network Error (Status: ${response.status})`);
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+            header: true,
+            transformHeader: header => header.trim().toLowerCase(),
+            skipEmptyLines: true,
+            complete: (results) => {
+                if (!results.data || results.data.length === 0) {
+                    throw new Error("Sheet is empty or unreadable.");
                 }
-            }, 60000); // 60000 มิลลิวินาที = 1 นาที
+
+                if (!results.data[0].hasOwnProperty('key') || !results.data[0].hasOwnProperty('month_year')) {
+                    throw new Error("Data Format Error: The sheet is missing 'key' or 'month_year' columns. This dashboard expects a pre-aggregated data format with monthly categorization.");
+                }
+
+                allRawData = results.data; // เก็บข้อมูลดิบทั้งหมด
+
+                populateMonthSelector(allRawData); // สร้างตัวเลือกเดือน
+                
+                // กรองและแสดงข้อมูลสำหรับเดือนปัจจุบันหรือเดือนที่เลือกไว้
+                const selectedMonth = document.getElementById('monthSelector').value;
+                filterAndDisplayData(selectedMonth);
+
+                loadingOverlay.style.display = 'none';
+                document.querySelector('.container').style.display = 'block';
+            },
+            error: (error) => { throw new Error(`CSV Parsing Error: ${error.message}`); }
         });
 
-        // ฟังก์ชันหลักในการโหลดและแสดงข้อมูล
-        async function loadAndDisplayData(kpiChart, siteChart, categoryChart, priorityChart, issueFromChart) { // NEW: Add issueFromChart parameter
-            const loadingOverlay = document.getElementById('loading');
-            try {
-                // ใช้ฟังก์ชัน getGoogleSheetUrlWithCacheBust เพื่อดึง URL ที่มี cache-buster
-                const urlToFetch = getGoogleSheetUrlWithCacheBust(); 
-                const response = await fetch(urlToFetch); // ดึงข้อมูลจาก URL ใหม่นี้
-                
-                if (!response.ok) throw new Error(`Network Error (Status: ${response.status})`);
-                const csvText = await response.text();
-                
-                Papa.parse(csvText, {
-                    header: true,
-                    transformHeader: header => header.trim().toLowerCase(),
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        if (!results.data || results.data.length === 0) {
-                            throw new Error("Sheet is empty or unreadable.");
-                        }
+    } catch (error) {
+        console.error('Failed to load or process sheet data:', error);
+        loadingOverlay.innerHTML = `
+            <strong>Error: Could not load report data.</strong>
+            <br><br>
+            Please check the following:
+            <br>1. The Google Sheet URL is correct.
+            <br>2. The sheet is "Published to the web" as a CSV.
+            <br>3. The sheet has 'key' and 'month_year' columns for aggregated data.
+            <br><br>
+            <small>Details: ${error.message}</small>
+        `;
+    }
+}
 
-                        // Check if the sheet has the 'key' column, indicating it's the aggregated data format.
-                        if (!results.data[0].hasOwnProperty('key')) {
-                            throw new Error("Data Format Error: The sheet is missing the 'key' column. This dashboard expects a pre-aggregated data format.");
-                        }
+function populateMonthSelector(data) {
+    const monthSelector = document.getElementById('monthSelector');
+    monthSelector.innerHTML = '<option value="all">All</option>'; // รีเซ็ตตัวเลือก
 
-                        const processedData = processAggregatedData(results.data);
-                        
-                        updateAllVisuals(processedData, kpiChart, siteChart, categoryChart, priorityChart, issueFromChart); // NEW: Pass new chart instance
-                        
-                        // ซ่อน Overlay และแสดง Dashboard เมื่อโหลดเสร็จ
-                        loadingOverlay.style.display = 'none';
-                        document.querySelector('.container').style.display = 'block';
-                    },
-                    error: (error) => { throw new Error(`CSV Parsing Error: ${error.message}`); }
-                });
+    const availableMonths = new Set();
+    data.forEach(row => {
+        if (row.month_year) {
+            availableMonths.add(row.month_year);
+        }
+    });
 
-            } catch (error) {
-                console.error('Failed to load or process sheet data:', error);
-                // แสดงข้อความข้อผิดพลาดบนหน้าจอ
-                loadingOverlay.innerHTML = `
-                    <strong>Error: Could not load report data.</strong>
-                    <br><br>
-                    Please check the following:
-                    <br>1. The Google Sheet URL is correct.
-                    <br>2. The sheet is "Published to the web" as a CSV.
-                    <br>3. The sheet has a 'key' column for aggregated data.
-                    <br><br>
-                    <small>Details: ${error.message}</small>
-                `;
+    const sortedMonths = Array.from(availableMonths).sort().reverse(); // เรียงจากล่าสุดไปเก่าสุด
+
+    sortedMonths.forEach(monthYear => {
+        const option = document.createElement('option');
+        option.value = monthYear;
+        // แปลง 'YYYY-MM' เป็นชื่อเดือนภาษาไทย
+        const [year, month] = monthYear.split('-');
+        const date = new Date(year, parseInt(month) - 1, 1); // Month is 0-indexed
+        const monthName = date.toLocaleString('en-EN', { month: 'long' });
+        option.textContent = `${monthName} ${year}`;
+        monthSelector.appendChild(option);
+    });
+
+    // ตั้งค่าเริ่มต้นให้เป็นเดือนปัจจุบันหรือเดือนล่าสุดที่มีข้อมูล
+    const currentYearMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    if (sortedMonths.includes(currentYearMonth)) {
+        monthSelector.value = currentYearMonth;
+    } else if (sortedMonths.length > 0) {
+        monthSelector.value = sortedMonths[0]; // เลือกเดือนล่าสุดถ้าเดือนปัจจุบันไม่มีข้อมูล
+    } else {
+        monthSelector.value = 'all'; // ไม่มีข้อมูลเลย
+    }
+}
+
+function filterAndDisplayData(selectedMonth) {
+    let filteredData = allRawData;
+    if (selectedMonth !== 'all') {
+        filteredData = allRawData.filter(row => row.month_year === selectedMonth);
+    }
+    
+    
+    // ตรวจสอบว่ามีข้อมูลสำหรับเดือนที่เลือกหรือไม่
+    if (filteredData.length === 0 && selectedMonth !== 'all') {
+        console.warn(`No data found for month: ${selectedMonth}. Displaying all data.`);
+        filteredData = allRawData; // ถ้าไม่มีข้อมูลสำหรับเดือนนั้น ให้แสดงข้อมูลทั้งหมด
+        // อาจจะแสดงข้อความแจ้งเตือนผู้ใช้ด้วยก็ได้
+    }
+
+    const processedData = processAggregatedData(filteredData);
+    updateAllVisuals(processedData, currentKpiChart, currentSiteChart, currentCategoryChart, currentPriorityChart, currentIssueFromChart);
+}
+
+// ฟังก์ชันสำหรับแปลงข้อความ "X ชม. Y นาที" ให้เป็นนาทีรวม
+function parseHMSToMinutes(timeString) {
+    if (!timeString || timeString.trim().toLowerCase() === 'n/a') {
+        return 0; // คืนค่า 0 นาที ถ้าไม่มีข้อมูลหรือเป็น N/A
+    }
+
+    let totalMinutes = 0;
+    const parts = timeString.match(/(\d+)\s*hr|(\d+)\s*min/g); // ดึงส่วนที่เป็น ชั่วโมง/นาที ออกมา
+
+    if (parts) {
+        parts.forEach(part => {
+            if (part.includes('hr')) {
+                totalMinutes += parseInt(part) * 60; // แปลงชั่วโมงเป็นนาที
+            } else if (part.includes('min')) {
+                totalMinutes += parseInt(part); // เพิ่มนาที
+            }
+        });
+    }
+    return totalMinutes;
+}
+
+
+// ฟังก์ชันสำหรับแปลงค่านาที (ทศนิยม) ให้เป็น "X hr Y min"
+function formatMinutesToHMS(totalMinutes) {
+    if (totalMinutes === 0 || isNaN(totalMinutes)) {
+        return 'N/A';
+    }
+
+    const hours = Math.floor(totalMinutes / 60); // จำนวนเต็มของชั่วโมง
+    const minutes = Math.round(totalMinutes % 60); // จำนวนนาทีที่เหลือ (ปัดเศษ)
+
+    let result = '';
+    if (hours > 0) {
+        result += `${hours} hr`; // เปลี่ยนจาก 'ชม.' เป็น 'hr'
+    }
+    if (minutes > 0) {
+        if (result !== '') {
+            result += ' '; // เพิ่มช่องว่างถ้าระบุชั่วโมงด้วย
+        }
+        result += `${minutes} min`; // เปลี่ยนจาก 'นาที' เป็น 'min'
+    }
+
+    if (result === '') { // ถ้าค่าน้อยมากจนเป็น 0 ชั่วโมง 0 นาที
+        return 'less than 1 min'; // เปลี่ยนจาก 'น้อยกว่า 1 นาที' เป็น 'less than 1 min'
+    }
+    
+    return result;
+}
+
+// --- ฟังก์ชัน processAggregatedData ที่แก้ไขแล้ว ---
+function processAggregatedData(rows) {
+    const data = { kpis: {}, performance: {}, sites: [], categories: [], modules: [], insights: [], unknownCauses: [], priorities: [], issueFrom: [] };
+    const tempKpis = {
+        kpi_total: 0,
+        kpi_completed: 0,
+        kpi_inprogress: 0,
+        kpi_bugs: 0
+    };
+
+    const siteMap = new Map();
+    const categoryMap = new Map();
+    const moduleMap = new Map();
+    const priorityMap = new Map();
+    const issueFromMap = new Map();
+    const unknownCausesSet = new Set();
+
+    // --- เพิ่มตัวแปรสำหรับรวมเวลาและนับจำนวนครั้งที่พบ (ในหน่วยนาที) ---
+    let totalResponseTimeMinutes = 0;
+    let responseCount = 0; // นับจำนวน perf_response entries
+    let totalCloseTimeMinutes = 0;
+    let closeCount = 0; // นับจำนวน perf_close entries
+    let totalOver24HrCases = 0; // สำหรับ perf_over24
+
+    for (const row of rows) {
+        const key = row.key;
+        const value1 = row.value1; // ค่าเช่น "0 hr 9 min" หรือตัวเลข
+        const value2 = row.value2;
+        const value3 = row.value3;
+
+        if (key.startsWith('kpi_')) {
+            tempKpis[key] = (parseInt(tempKpis[key]) || 0) + (parseInt(value1) || 0);
+        }
+        // --- เริ่มต้นการจัดการ perf_ data ที่เป็นข้อความ ---
+        else if (key === 'perf_response') {
+            const minutes = parseHMSToMinutes(value1);
+            totalResponseTimeMinutes += minutes;
+            // นับ entry นี้เฉพาะเมื่อมีการแปลงค่าได้ หรือเป็น '0 hr 0 min'
+            if (!isNaN(minutes)) { // ตรวจสอบว่าไม่เป็น NaN (กรณี string ไม่ถูกต้อง)
+                responseCount++;
             }
         }
-
-        // ฟังก์ชันประมวลผลข้อมูล
-        function processAggregatedData(rows) {
-            const data = { kpis: {}, performance: {}, sites: [], categories: [], modules: [], insights: [], unknownCauses: [], priorities: [], issueFrom: [] }; // NEW: Add issueFrom array
-            const tempKpis = {};
-
-            for (const row of rows) {
-                const key = row.key;
-                const value1 = row.value1;
-                const value2 = row.value2;
-                const value3 = row.value3;
-
-                if (key.startsWith('kpi_')) tempKpis[key] = value1;
-                else if (key.startsWith('perf_')) data.performance[key] = value1;
-                else if (key === 'site_data') data.sites.push({ name: value1, count: parseInt(value2) || 0 });
-                else if (key === 'category_data') data.categories.push({ name: value1, count: parseInt(value2) || 0 });
-                else if (key === 'module_data') data.modules.push({ name: value1, count: parseInt(value2) || 0, icon: value3 });
-                else if (key === 'insight_data') data.insights.push({ title: value1, text: value2 });
-                else if (key === 'unknown_cause_description') data.unknownCauses.push({ description: value1 });
-                else if (key === 'priority_data') data.priorities.push({ level: value1, count: parseInt(value2) || 0 });
-                else if (key === 'issue_from_data') data.issueFrom.push({ source: value1, count: parseInt(value2) || 0 }); // NEW: Process issue_from_data
-                else if (key === 'report_subtitle') document.getElementById('report-subtitle').innerText = value1;
+        else if (key === 'perf_close') {
+            const minutes = parseHMSToMinutes(value1);
+            totalCloseTimeMinutes += minutes;
+            if (!isNaN(minutes)) {
+                closeCount++;
             }
-            data.kpis = tempKpis;
-            return data;
         }
-
-        // ฟังก์ชันอัปเดตองค์ประกอบทั้งหมด
-        function updateAllVisuals(data, kpiChart, siteChart, categoryChart, priorityChart, issueFromChart) { // NEW: Add issueFromChart parameter
-            updateKpiCard(data.kpis, kpiChart);
-            updateSiteChart(data.sites, siteChart);
-            updateCategoryChart(data.categories, categoryChart);
-            updatePerformanceMetrics(data.performance);
-            updateModules(data.modules);
-            updateInsights(data.insights);
-            updateUnknownCauses(data.unknownCauses);
-            updatePriorityChart(data.priorities, priorityChart);
-            updateIssueFromChart(data.issueFrom, issueFromChart); // NEW: Call update for new chart
+        else if (key === 'perf_over24') {
+            totalOver24HrCases += (parseInt(value1) || 0);
         }
-
-        // ฟังก์ชันอัปเดต KPI Card (ไม่มีการเปลี่ยนแปลง)
-        function updateKpiCard(kpis, chart) {
-            const completed = parseInt(kpis.kpi_completed) || 0;
-            const inProgress = parseInt(kpis.kpi_inprogress) || 0;
-            const bugCases = parseInt(kpis.kpi_bugs) || 0;
-            const total = completed + inProgress;
-            const rate = total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%';
-
-            document.getElementById('kpi-total').innerText = total;
-            document.getElementById('kpi-completed').innerText = completed;
-            document.getElementById('kpi-inprogress').innerText = inProgress;
-            document.getElementById('kpi-rate').innerText = rate;
-            document.getElementById('kpi-bugs').innerText = bugCases;
-            
-            chart.data.datasets[0].data = [completed, inProgress];
-            chart.update();
+        // --- จบการจัดการ perf_ data ---
+        else if (key === 'site_data') {
+            const count = parseInt(value2) || 0;
+            siteMap.set(value1, (siteMap.get(value1) || 0) + count);
         }
-
-        // ฟังก์ชันอัปเดต Site Chart (ไม่มีการเปลี่ยนแปลง)
-        function updateSiteChart(sites, chart) {
-            sites.sort((a, b) => b.count - a.count);
-            chart.data.labels = sites.map(s => s.name);
-            chart.data.datasets[0].data = sites.map(s => s.count);
-            chart.update();
+        else if (key === 'category_data') {
+            const count = parseInt(value2) || 0;
+            categoryMap.set(value1, (categoryMap.get(value1) || 0) + count);
         }
-
-        // ฟังก์ชันอัปเดต Category Chart (ไม่มีการเปลี่ยนแปลง)
-        function updateCategoryChart(categories, chart) {
-            chart.data.labels = categories.map(c => c.name);
-            chart.data.datasets[0].data = categories.map(c => c.count);
-            chart.update();
+        else if (key === 'module_data') {
+            const count = parseInt(value2) || 0;
+            const existingModule = moduleMap.get(value1);
+            if (existingModule) {
+                existingModule.count += count;
+            } else {
+                moduleMap.set(value1, { name: value1, count: count, icon: value3 });
+            }
         }
-
-        // ฟังก์ชันอัปเดต Performance Metrics (ไม่มีการเปลี่ยนแปลง)
-        function updatePerformanceMetrics(performance) {
-            document.getElementById('perf-response').innerText = performance.perf_response || 'N/A';
-            document.getElementById('perf-close').innerText = performance.perf_close || 'N/A';
-            document.getElementById('perf-over24').innerText = performance.perf_over24 || 'N/A';
+        else if (key === 'insight_data') {
+            data.insights.push({ title: value1, text: value2 });
         }
-
-        // ฟังก์ชันอัปเดต Modules (ไม่มีการเปลี่ยนแปลง)
-        function updateModules(modules) {
-            const container = document.getElementById('modules-grid-container');
-            container.innerHTML = '';
-            modules.sort((a, b) => b.count - a.count);
-            modules.forEach(module => {
-                const item = document.createElement('div');
-                item.className = 'module-item';
-                item.innerHTML = `
-                    <div class="module-icon">${module.icon || '⚙️'}</div>
-                    <div class="module-name">${module.name}</div>
-                    <div class="module-count">${module.count}</div>
-                `;
-                container.appendChild(item);
-            });
+        else if (key === 'unknown_cause_description') {
+            unknownCausesSet.add(value1);
         }
-        
-        // ฟังก์ชันอัปเดต Insights (ไม่มีการเปลี่ยนแปลง)
-        function updateInsights(insights) {
-            const container = document.getElementById('insights-container');
-            container.innerHTML = '';
-            insights.forEach(insight => {
-                const item = document.createElement('div');
-                item.className = 'insight-item';
-                item.innerHTML = `
-                    <h4>${insight.title}</h4>
-                    <p>${insight.text}</p>
-                `;
-                container.appendChild(item);
-            });
+        else if (key === 'priority_data') {
+            const count = parseInt(value2) || 0;
+            priorityMap.set(value1, (priorityMap.get(value1) || 0) + count);
         }
-
-        // ฟังก์ชันอัปเดต Unknown Causes (ไม่มีการเปลี่ยนแปลง)
-        function updateUnknownCauses(unknownCauses) {
-            const container = document.getElementById('unknown-causes-container');
-            container.innerHTML = '';
-
-            unknownCauses.forEach(item => {
-                const insightItem = document.createElement('div');
-                insightItem.className = 'insight-item';
-                insightItem.innerHTML = `
-                    <h4>Description: ${item.description}</h4>
-                    <p>เคสนี้ยังไม่สามารถระบุสาเหตุที่ชัดเจนได้ ต้องการการตรวจสอบเพิ่มเติม.</p>
-                `;
-                container.appendChild(insightItem);
-            });
+        else if (key === 'issue_from_data') {
+            const count = parseInt(value2) || 0;
+            issueFromMap.set(value1, (issueFromMap.get(value1) || 0) + count);
         }
-
-        // ฟังก์ชันอัปเดต Priority Chart (ไม่มีการเปลี่ยนแปลง)
-        function updatePriorityChart(priorities, chart) {
-            const sortedPriorities = ['High', 'Medium', 'Low'].map(level => 
-                priorities.find(p => p.level === level) || { level, count: 0 }
-            );
-
-            chart.data.labels = sortedPriorities.map(p => p.level);
-            chart.data.datasets[0].data = sortedPriorities.map(p => p.count);
-            chart.update();
+        else if (key === 'report_subtitle') {
+            document.getElementById('report-subtitle').innerText = value1;
         }
+    }
 
-        // ฟังก์ชันสร้าง KPI Chart (ไม่มีการเปลี่ยนแปลง)
-        function createKpiChart() {
-            const ctx = document.getElementById('kpiChart').getContext('2d');
-            return new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: ['Completed', 'In Progress'], datasets: [{ data: [], backgroundColor: ['#10b981', '#f59e0b'], hoverBackgroundColor: ['#059669', '#d97706'], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' }
-            });
+    // แปลง Map/Set กลับเป็น Array
+    data.sites = Array.from(siteMap, ([name, count]) => ({ name, count }));
+    data.categories = Array.from(categoryMap, ([name, count]) => ({ name, count }));
+    data.modules = Array.from(moduleMap.values());
+    data.priorities = Array.from(priorityMap, ([level, count]) => ({ level, count }));
+    data.issueFrom = Array.from(issueFromMap, ([source, count]) => ({ source, count }));
+    data.unknownCauses = Array.from(unknownCausesSet).map(description => ({ description }));
+
+    // คำนวณ KPI completion rate ใหม่
+    const total = tempKpis.kpi_total;
+    const completed = tempKpis.kpi_completed;
+    tempKpis.kpi_rate = total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%';
+    data.kpis = tempKpis;
+
+    // --- คำนวณค่าเฉลี่ย Performance Metrics และจัดรูปแบบ ---
+    const avgResponseMinutes = responseCount > 0 ? (totalResponseTimeMinutes / responseCount) : 0;
+    const avgCloseMinutes = closeCount > 0 ? (totalCloseTimeMinutes / closeCount) : 0;
+
+    data.performance.perf_response = formatMinutesToHMS(avgResponseMinutes);
+    data.performance.perf_close = formatMinutesToHMS(avgCloseMinutes);
+    data.performance.perf_over24 = totalOver24HrCases; // ยังคงเป็นผลรวม
+    // --- จบการคำนวณ Performance Metrics ---
+
+    return data;
+}
+
+
+// (ส่วนของ createChart functions และ update functions อื่นๆ ไม่ต้องเปลี่ยน)
+// ฟังก์ชันสร้าง KPI Chart
+function createKpiChart() {
+    const ctx = document.getElementById('kpiChart').getContext('2d');
+    return new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: ['Completed', 'In Progress'], datasets: [{ data: [], backgroundColor: ['#10b981', '#f59e0b'], hoverBackgroundColor: ['#059669', '#d97706'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' }
+    });
+}
+
+// ฟังก์ชันสร้าง Site Chart
+function createSiteChart() {
+    const ctx = document.getElementById('siteChart').getContext('2d');
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#8A2BE2', '#00CED1', '#FFD700', '#FF1493',
+                    '#00BFFF', '#3CB371', '#CD5C5C', '#6A5ACD', '#FF4500'
+                ],
+                borderRadius: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Case Distribution by Site', font: { size: 16, weight: 'bold' }, color: '#1e3c72' }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b' } }
+            }
         }
+    });
+}
 
-        // ฟังก์ชันสร้าง Site Chart (แก้ไขส่วนสี)
-        function createSiteChart() {
-            const ctx = document.getElementById('siteChart').getContext('2d');
-            return new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        // *** เปลี่ยนชุดสีตรงนี้ ***
-                        backgroundColor: [
-                            '#FF6384', // แดงอมชมพู
-                            '#36A2EB', // น้ำเงิน
-                            '#FFCE56', // เหลือง
-                            '#4BC0C0', // เขียวอมฟ้า
-                            '#9966FF', // ม่วง
-                            '#FF9F40', // ส้ม
-                            '#8A2BE2', // น้ำเงินม่วง (BlueViolet)
-                            '#00CED1', // เทอร์ควอยซ์เข้ม (DarkTurquoise)
-                            '#FFD700', // ทอง (Gold)
-                            '#FF1493', // ชมพูเข้ม (DeepPink)
-                            '#00BFFF', // ฟ้าสด (DeepSkyBlue)
-                            '#3CB371', // เขียวปานกลาง (MediumSeaGreen)
-                            '#CD5C5C', // แดงอมน้ำตาล (IndianRed)
-                            '#6A5ACD', // น้ำเงินอมม่วง (SlateBlue)
-                            '#FF4500'  // ส้มแดง (OrangeRed)
-                        ],
-                        borderRadius: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        title: { // เพิ่ม Title ให้กราฟ (ถ้าต้องการ)
-                            display: true,
-                            text: 'Case Distribution by Site',
-                            font: { size: 16, weight: 'bold' },
-                            color: '#1e3c72'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b' } // สีตัวอักษรบนแกน X
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: '#64748b' } // สีตัวอักษรบนแกน Y
-                        }
-                    }
-                }
-            });
+// ฟังก์ชันสร้าง Category Chart
+function createCategoryChart() {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    return new Chart(ctx, {
+        type: 'pie',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#60a5fa'], hoverBackgroundColor: ['#dc2626', '#2563eb', '#059669', '#d97706', '#3b82f6'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, font: { size: 12 } } } } }
+    });
+}
+
+// ฟังก์ชันสร้าง Priority Chart
+function createPriorityChart() {
+    const ctx = document.getElementById('priorityChart').getContext('2d');
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Number of Cases',
+                data: [],
+                backgroundColor: ['#e3342f', '#f6993f', '#6cb2eb'],
+                borderRadius: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b' } }
+            }
         }
+    });
+}
 
-        // ฟังก์ชันสร้าง Category Chart (ไม่มีการเปลี่ยนแปลง)
-        function createCategoryChart() {
-            const ctx = document.getElementById('categoryChart').getContext('2d');
-            return new Chart(ctx, {
-                type: 'pie',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ef4444', '#3b82f6'], hoverBackgroundColor: ['#dc2626', '#2563eb'], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, font: { size: 12 } } } } }
-            });
-        }
+// NEW: ฟังก์ชันสร้าง Issue From Chart
+function createIssueFromChart() {
+    const ctx = document.getElementById('issueFromChart').getContext('2d');
+    return new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#a78bfa', '#fbbf24', '#f87171', '#34d399'], hoverBackgroundColor: ['#8b5cf6', '#f59e0b', '#ef4444', '#10b981'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, font: { size: 12 } } }, cutout: '75%' } }
+    });
+}
 
-        // ฟังก์ชันสร้าง Priority Chart (ไม่มีการเปลี่ยนแปลง)
-        function createPriorityChart() {
-            const ctx = document.getElementById('priorityChart').getContext('2d');
-            return new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Number of Cases',
-                        data: [],
-                        backgroundColor: ['#e3342f', '#f6993f', '#6cb2eb'],
-                        borderRadius: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        title: {
-                            display: true,
-                            text: 'Cases by Priority',
-                            font: { size: 16, weight: 'bold' },
-                            color: '#1e3c72'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b' }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: '#64748b' }
-                        }
-                    }
-                }
-            });
-        }
+// NEW: ฟังก์ชันอัปเดต Issue From Chart
+function updateIssueFromChart(issueFrom, chart) {
+    issueFrom.sort((a, b) => b.count - a.count); // เรียงตามจำนวน
+    chart.data.labels = issueFrom.map(i => i.source);
+    chart.data.datasets[0].data = issueFrom.map(i => i.count);
+    chart.update();
+}
 
-        // ฟังก์ชันสร้าง Issue From Chart (แก้ไขส่วนสี)
-        function createIssueFromChart() {
-            const ctx = document.getElementById('issueFromChart').getContext('2d');
-            return new Chart(ctx, {
-                type: 'doughnut', // Pie หรือ Doughnut เหมาะสำหรับแสดงสัดส่วน
-                data: {
-                    labels: [], // จะถูกเติมด้วย 'E-Mail', 'Line', 'On-Call'
-                    datasets: [{
-                        data: [], // จะถูกเติมด้วยจำนวนเคส
-                        // *** เปลี่ยนชุดสีตรงนี้ ***
-                        backgroundColor: [
-                            '#9966FF', // Emerald Green
-                            '#4BC0C0', // Peter River Blue
-                            '#FF9F40', // Sunflower Yellow
-                            '#e74c3c', // Alizarin Red
-                            '#9b59b6', // Amethyst Purple
-                            '#1abc9c', // Turquoise
-                            '#e67e22', // Carrot Orange
-                            '#34495e', // Wet Asphalt Dark Blue
-                            '#FF6384', // เดิมจาก Site Chart (Red)
-                            '#FFCE56', // เดิมจาก Site Chart (Yellow)
-                            '#4BC0C0', // เดิมจาก Site Chart (Aqua)
-                            '#9966FF', // เดิมจาก Site Chart (Purple)
-                            '#FF9F40'  // เดิมจาก Site Chart (Orange)
-                        ],
-                        hoverOffset: 8, // ยกออกมาเล็กน้อยเมื่อเมาส์ชี้
-                        borderWidth: 0 // ไม่มีเส้นขอบ
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom', // Legend อยู่ด้านล่าง
-                            labels: {
-                                padding: 20,
-                                font: { size: 12 },
-                                color: '#64748b' // สีตัวอักษรของ legend
-                            }
-                        },
-                        tooltip: { // ปรับ Tooltip เพื่อให้แสดงข้อมูลได้ดีขึ้น
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed !== null) {
-                                        label += context.parsed + ' cases'; // เพิ่มหน่วย 'cases'
-                                    }
-                                    return label;
-                                }
-                            }
-                        },
-                        title: { // เพิ่ม Title ให้กราฟ (ถ้าต้องการ)
-                            display: true,
-                            text: 'Issue Source Distribution',
-                            font: { size: 16, weight: 'bold' },
-                            color: '#1e3c72'
-                        }
-                    },
-                    cutout: '70%' // ทำให้เป็น Doughnut Chart (วงแหวน)
-                }
-            });
-        }
+// ฟังก์ชันอัปเดตองค์ประกอบทั้งหมด
+function updateAllVisuals(data, kpiChart, siteChart, categoryChart, priorityChart, issueFromChart) {
+    updateKpiCard(data.kpis, kpiChart);
+    updateSiteChart(data.sites, siteChart);
+    updateCategoryChart(data.categories, categoryChart);
+    updatePerformanceMetrics(data.performance);
+    updateModules(data.modules);
+    updateInsights(data.insights);
+    updateUnknownCauses(data.unknownCauses);
+    updatePriorityChart(data.priorities, priorityChart);
+    updateIssueFromChart(data.issueFrom, issueFromChart);
+}
 
-        // NEW: ฟังก์ชันอัปเดต Issue From Chart
-        function updateIssueFromChart(issueFromData, chart) {
-            // เรียงข้อมูลตามจำนวนเคสจากมากไปน้อย (ไม่บังคับ แต่ช่วยให้อ่านง่ายขึ้น)
-            issueFromData.sort((a, b) => b.count - a.count);
+// (ฟังก์ชัน updateKpiCard, updateSiteChart, updateCategoryChart, updatePerformanceMetrics,
+// updateModules, updateInsights, updateUnknownCauses, updatePriorityChart เหมือนเดิม)
+function updateKpiCard(kpis, chart) {
+    const completed = parseInt(kpis.kpi_completed) || 0;
+    const inProgress = parseInt(kpis.kpi_inprogress) || 0;
+    const bugCases = parseInt(kpis.kpi_bugs) || 0;
+    const total = (parseInt(kpis.kpi_total) || 0); // ใช้ kpi_total ที่ประมวลผลแล้ว
+    const rate = total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%';
 
-            chart.data.labels = issueFromData.map(item => item.source); // ชื่อช่องทาง
-            chart.data.datasets[0].data = issueFromData.map(item => item.count); // จำนวนเคส
-            chart.update(); // อัปเดตกราฟ
-        }
+    document.getElementById('kpi-total').innerText = total;
+    document.getElementById('kpi-completed').innerText = completed;
+    document.getElementById('kpi-inprogress').innerText = inProgress;
+    document.getElementById('kpi-rate').innerText = rate;
+    document.getElementById('kpi-bugs').innerText = bugCases;
+
+    chart.data.datasets[0].data = [completed, inProgress];
+    chart.update();
+}
+
+function updateSiteChart(sites, chart) {
+    sites.sort((a, b) => b.count - a.count);
+    chart.data.labels = sites.map(s => s.name);
+    chart.data.datasets[0].data = sites.map(s => s.count);
+    chart.update();
+}
+
+function updateCategoryChart(categories, chart) {
+    categories.sort((a, b) => b.count - a.count);
+    chart.data.labels = categories.map(c => c.name);
+    chart.data.datasets[0].data = categories.map(c => c.count);
+    chart.update();
+}
+
+function updatePerformanceMetrics(performance) {
+    document.getElementById('perf-response').innerText = performance.perf_response || 'N/A';
+    document.getElementById('perf-close').innerText = performance.perf_close || 'N/A';
+    document.getElementById('perf-over24').innerText = performance.perf_over24 || 'N/A';
+}
+
+function updateModules(modules) {
+    const container = document.getElementById('modules-grid-container');
+    container.innerHTML = '';
+    modules.sort((a, b) => b.count - a.count);
+    modules.forEach(module => {
+        const item = document.createElement('div');
+        item.className = 'module-item';
+        item.innerHTML = `
+            <div class="module-icon">${module.icon || '⚙️'}</div>
+            <div class="module-name">${module.name}</div>
+            <div class="module-count">${module.count}</div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// ฟังก์ชันสำหรับแปลงข้อความ "X ชม. Y นาที" ให้เป็นนาทีรวม
+function parseHMSToMinutes(timeString) {
+    if (!timeString || timeString.trim().toLowerCase() === 'n/a') {
+        return 0; // คืนค่า 0 นาที ถ้าไม่มีข้อมูลหรือเป็น N/A
+    }
+
+    let totalMinutes = 0;
+    const parts = timeString.match(/(\d+)\s*hr|(\d+)\s*min/g); // ดึงส่วนที่เป็น ชั่วโมง/นาที ออกมา
+
+    if (parts) {
+        parts.forEach(part => {
+            if (part.includes('hr')) {
+                totalMinutes += parseInt(part) * 60; // แปลงชั่วโมงเป็นนาที
+            } else if (part.includes('min')) {
+                totalMinutes += parseInt(part); // เพิ่มนาที
+            }
+        });
+    }
+    return totalMinutes;
+}
+
+function updateInsights(insights) {
+    // *** แก้ไขตรงนี้: กำหนดค่าให้ container ด้วย document.getElementById ***
+    const container = document.getElementById('insights-container'); 
+
+    // ตรวจสอบว่าหา container เจอหรือไม่ ก่อนที่จะดำเนินการต่อ
+    if (!container) {
+        console.error("Error: Element with ID 'insights-container' not found in the HTML.");
+        return; // หยุดฟังก์ชันเพื่อป้องกัน Error
+    }
+
+    container.innerHTML = ''; // ล้างข้อมูลเก่า
+    if (insights.length === 0) {
+        container.innerHTML = '<div class="insight-item"><p class="text-gray-500">No specific insights for this period.</p></div>';
+    } else {
+        insights.forEach(item => {
+            const insightDiv = document.createElement('div');
+            insightDiv.className = 'insight-item';
+            insightDiv.innerHTML = `
+                <h4>${item.title || 'Untitled Insight'}</h4>
+                <p>${item.text || 'No description available.'}</p>
+            `;
+            container.appendChild(insightDiv);
+        });
+    }
+}
+
+function updateUnknownCauses(unknownCauses) {
+    const container = document.getElementById('unknown-causes-container');
+    container.innerHTML = '';
+
+    unknownCauses.forEach(item => {
+        const insightItem = document.createElement('div');
+        insightItem.className = 'insight-item';
+        insightItem.innerHTML = `
+            <h4>Description: ${item.description}</h4>
+            <p>เคสนี้ยังไม่สามารถระบุสาเหตุที่ชัดเจนได้ ต้องการการตรวจสอบเพิ่มเติม.</p>
+        `;
+        container.appendChild(insightItem);
+    });
+}
+
+function updatePriorityChart(priorities, chart) {
+    const sortedPriorities = ['High', 'Medium', 'Low'].map(level =>
+        priorities.find(p => p.level === level) || { level, count: 0 }
+    );
+
+    chart.data.labels = sortedPriorities.map(p => p.level);
+    chart.data.datasets[0].data = sortedPriorities.map(p => p.count);
+    chart.update();
+}
     </script>
 </body>
 </html>
